@@ -7,75 +7,120 @@ This file provides guidance to AI assistants (Claude and others) working in this
 ## Repository Overview
 
 - **Repository**: `mstojanovickg/doc`
-- **Purpose**: Documentation repository (currently being initialized)
-- **Status**: New repository — no prior commits or source files exist yet
+- **Purpose**: Robot Implementation Decision Support Tool — a full-stack web application that digitises and extends an Excel-based robot feasibility model (Model_za_PhD).
+- **Stack**: Python/FastAPI backend + React/TypeScript frontend + PostgreSQL + Docker Compose
 
 ---
 
 ## Repository Structure
 
-As this repository is in its initial state, the structure will be established as content is added. Update this section when a layout is introduced.
-
-Suggested structure for a documentation-focused repo:
-
 ```
 /
-├── CLAUDE.md          # AI assistant guidance (this file)
-├── README.md          # Human-facing project overview
-├── docs/              # Documentation source files
-│   ├── guides/        # How-to guides
-│   ├── reference/     # API / technical reference
-│   └── tutorials/     # Step-by-step tutorials
-└── .github/           # GitHub-specific config (workflows, templates)
+├── CLAUDE.md                       # AI assistant guidance (this file)
+├── docker-compose.yml              # Orchestrates postgres, backend, frontend
+│
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── main.py                 # FastAPI app, CORS, lifespan (DB init)
+│       ├── models/
+│       │   ├── inputs.py           # Pydantic input schema (CalculationInput)
+│       │   └── outputs.py          # Pydantic output schema (CalculationResult)
+│       ├── engine/
+│       │   └── calculator.py       # All KPI formulas — core business logic
+│       ├── routers/
+│       │   ├── calculate.py        # POST /api/calculate
+│       │   └── sessions.py         # CRUD /api/sessions
+│       └── db/
+│           ├── database.py         # SQLAlchemy async engine + session
+│           └── models.py           # Session ORM model (PostgreSQL)
+│
+└── frontend/
+    ├── Dockerfile
+    ├── package.json                # React 18, Zustand, Recharts, Tailwind, Vite
+    ├── vite.config.ts              # Proxy /api → backend:8000
+    ├── tailwind.config.js
+    ├── index.html
+    └── src/
+        ├── main.tsx
+        ├── App.tsx                 # Root: header + wizard/dashboard switch
+        ├── index.css               # Tailwind + print styles
+        ├── types/index.ts          # TypeScript mirrors of Python Pydantic models
+        ├── store/useStore.ts       # Zustand store (inputs, results, sessions)
+        ├── api/client.ts           # Axios wrappers for backend endpoints
+        ├── utils/formatting.ts     # RSD formatting, time parsing (h:mm:ss ↔ min)
+        └── components/
+            ├── common/
+            │   ├── FormField.tsx   # Label+input wrapper with validation UI
+            │   └── TimeInput.tsx   # h:mm:ss ↔ decimal-minutes input
+            ├── wizard/
+            │   ├── WizardLayout.tsx         # Step progress bar + nav buttons
+            │   ├── KPISidebar.tsx           # Live KPI panel (auto-recalculates)
+            │   └── steps/
+            │       ├── Step1General.tsx     # Product price, takt time, growth
+            │       ├── Step2Manual.tsx      # Shifts, CT, salary, OEE inputs
+            │       ├── Step3RobotTech.tsx   # Robot price, power, maintenance
+            │       ├── Step4RobotLabor.tsx  # Training, engineering, OPT%
+            │       └── Step5Financing.tsx   # Loan/own funds, WACC, scenarios
+            ├── dashboard/
+            │   ├── Dashboard.tsx            # Container; print/export button
+            │   ├── HeroStrip.tsx            # 4 large KPI cards (ΔNP, ROI, PP, NPV)
+            │   ├── FinancialSection.tsx     # Bar, waterfall, NPV fan, BEP charts
+            │   ├── OperationalSection.tsx   # OEE radar, production bar, saved hours
+            │   ├── CostTable.tsx            # M vs R cost comparison table
+            │   ├── SafetySection.tsx        # Defect/sick-leave rates, injury cost
+            │   └── FinancingSection.tsx     # Investment breakdown, loan schedule
+            └── SessionManager.tsx          # Save / load / delete sessions modal
 ```
 
 ---
 
 ## Development Workflows
 
+### Running the Application
+
+```bash
+# Start all services
+docker compose up --build
+
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API docs: http://localhost:8000/docs
+```
+
+### Individual Service Development
+
+```bash
+# Backend only (with hot-reload)
+cd backend && uvicorn app.main:app --reload --port 8000
+
+# Frontend only
+cd frontend && npm install && npm run dev
+```
+
 ### Branching Strategy
 
-- **Main branch**: `main` (or `master`) — protected; never commit directly
+- **Main branch**: `main` — protected; never commit directly
 - **Feature branches**: `feature/<short-description>`
 - **Bug-fix branches**: `fix/<short-description>`
 - **AI-session branches**: `claude/<task-slug>-<session-id>` (auto-created per session)
 
-### Making Changes
-
-1. Always develop on the designated branch for the current session
-2. Keep commits small and focused; one logical change per commit
-3. Write descriptive commit messages (see convention below)
-4. Push to `origin/<branch>` when work is complete
-
 ### Commit Message Convention
 
-Use the **imperative mood** and keep the subject line under 72 characters:
+Use the **imperative mood**, subject line under 72 characters:
 
 ```
 <type>: <short summary>
-
-[Optional body — explain the why, not the what]
 ```
 
-Types:
-| Type       | When to use                              |
-|------------|------------------------------------------|
-| `feat`     | New content or feature                   |
-| `fix`      | Corrections or bug fixes                 |
-| `docs`     | Documentation-only changes               |
-| `refactor` | Restructuring without behavior change    |
-| `chore`    | Tooling, config, dependency updates      |
-
-Example:
-```
-docs: add getting-started guide for new contributors
-```
-
-### Pull Requests
-
-- Open a PR from your feature branch into `main`
-- Include a clear description of what changed and why
-- Link any related issues with `Closes #<issue-number>`
+| Type       | When to use                        |
+|------------|------------------------------------|
+| `feat`     | New feature or content             |
+| `fix`      | Bug fix                            |
+| `docs`     | Documentation only                 |
+| `refactor` | Code restructuring, no logic change|
+| `chore`    | Tooling, deps, config              |
 
 ---
 
@@ -84,10 +129,25 @@ docs: add getting-started guide for new contributors
 ### General Principles
 
 1. **Read before editing** — always read existing files before modifying them
-2. **Minimal footprint** — make only the changes required by the task; avoid scope creep
-3. **No unnecessary files** — do not create boilerplate, READMEs, or docs unless explicitly requested
+2. **Minimal footprint** — make only the changes required by the task
+3. **No unnecessary files** — do not create boilerplate unless explicitly requested
 4. **Security first** — never commit secrets, credentials, or sensitive data
 5. **Prefer editing over creating** — update existing files rather than creating new ones
+
+### Calculation Engine Rules
+
+- All time values are **stored and computed in minutes** internally
+- Time is displayed as `h:mm:ss` or `h:mm` in the UI (see `utils/formatting.ts`)
+- All monetary values are in **RSD (Serbian Dinar)**
+- The Python engine in `backend/app/engine/calculator.py` is the **single source of truth** for all formulas — never replicate calculation logic in the frontend
+- Division-by-zero is handled via `_safe_div()` which returns `0.0`; results show N/A in the UI when a computed value is not meaningful
+
+### Frontend Rules
+
+- The Zustand store (`useStore.ts`) owns all application state; components should read from and write to the store, not maintain their own state for shared data
+- The KPI sidebar auto-recalculates with an 800 ms debounce whenever `inputs` changes (only when required fields are populated)
+- Time inputs use the `TimeInput` component which handles `h:mm`, `h:mm:ss`, and plain decimal-minutes formats
+- Percentage inputs are displayed as 0–100 but stored as fractions (0.0–1.0) in the store and backend
 
 ### Git Operations
 
@@ -108,24 +168,51 @@ docs: add getting-started guide for new contributors
 | Search file content | `Grep`          |
 | Run shell commands  | `Bash` (last resort) |
 
-### Code Quality
-
-- Do not add comments, docstrings, or type annotations to code you did not change
-- Do not add error handling for scenarios that cannot happen
-- Do not add features, abstractions, or helpers beyond what is needed
-- Trust framework guarantees; only validate at external boundaries
-
 ---
 
-## Working with This Repository
+## Key Business Logic Reference
 
-Since this repository is currently empty, the first tasks will likely involve:
+### Manual Production Formulas
 
-1. Establishing a `README.md`
-2. Setting up a directory structure
-3. Adding initial documentation content
+| Symbol | Formula |
+|--------|---------|
+| TDW    | shifts × shift_duration |
+| NDW    | TDW − shifts × breaks × break_duration |
+| MWT    | TDW × workdays_month |
+| AWT    | MWT × 12 |
+| DPV_M  | NDW / CT |
+| LC_M   | salary × 13 × workers |
+| DTC_M  | breakdowns × repair_time_h × LCPH × 12 |
 
-When those are in place, update the **Repository Structure** and **Development Workflows** sections of this file to reflect the actual state.
+### Robot Production Formulas
+
+| Symbol | Formula |
+|--------|---------|
+| DPV_R  | TDW / CT (robot works without breaks) |
+| EC     | power_kW × AWT_robot_hours × electricity_price |
+| INV    | robot + gripper + equipment + engineering + training |
+| LC_R   | salary × 13 × workers × operator_time_fraction |
+
+### Financial KPIs
+
+| KPI | Formula |
+|-----|---------|
+| ΔNP | NP_R − NP_M |
+| ROI | ΔNP / INV |
+| PP  | INV / (ΔNP / 12) in months |
+| NPV | −equity + Σ NCF_t / (1+WACC)^t over 5 years |
+| IEI | NPV / INV |
+| OEE | Availability × Performance × Quality |
+
+### Scenario Engine
+
+Three NPV scenarios apply multipliers to robot cash flows:
+
+| Scenario    | Inflow adj. | Outflow adj. | WACC adj. |
+|-------------|------------|--------------|-----------|
+| Pessimistic | +2%        | +5%          | +2%       |
+| Realistic   | +5%        | +3%          | 0%        |
+| Optimistic  | +8%        | −2%          | −2%       |
 
 ---
 
@@ -133,7 +220,7 @@ When those are in place, update the **Repository Structure** and **Development W
 
 Keep this file current as the project evolves:
 
-- Add new top-level directories to the structure diagram
-- Document any build, lint, or test commands once tooling is introduced
-- Record project-specific conventions that differ from the defaults above
-- Remove placeholder sections once real content replaces them
+- Update the structure diagram when new files or directories are added
+- Document new API endpoints when added to the backend
+- Record formula changes in the business logic reference section
+- Add test commands once a test suite is introduced
