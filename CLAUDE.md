@@ -96,7 +96,7 @@ docker compose up --build
 cd backend && uvicorn app.main:app --reload --port 8000
 
 # Frontend only
-cd frontend && npm install && npm run dev
+cd frontend && bun install && bun run dev
 ```
 
 ### Branching Strategy
