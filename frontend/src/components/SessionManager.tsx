@@ -1,5 +1,14 @@
 import React, { useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 export function SessionManager() {
   const { sessions, loadSessions, saveSession, loadSession, removeSession, activeSessionId } = useStore()
@@ -7,9 +16,9 @@ export function SessionManager() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const handleOpen = async () => {
-    await loadSessions()
-    setOpen(true)
+  const handleOpen = async (isOpen: boolean) => {
+    if (isOpen) await loadSessions()
+    setOpen(isOpen)
   }
 
   const handleSave = async () => {
@@ -23,84 +32,77 @@ export function SessionManager() {
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={handleOpen}
-        className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 text-gray-600"
-      >
-        Sessions
-      </button>
-    )
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
-      <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="font-semibold text-gray-800 mb-4">Sessions</h3>
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <button className="px-2.5 py-1 text-xs font-medium rounded-md transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-white/10">
+          Sessions
+        </button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Sessions</DialogTitle>
+        </DialogHeader>
 
         {/* Save */}
-        <div className="flex gap-2 mb-4">
-          <input
+        <div className="flex gap-2">
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Session name…"
-            className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm"
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            className="flex-1"
           />
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50"
+            size="sm"
           >
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
 
         {/* List */}
-        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+        <div className="space-y-1.5 max-h-64 overflow-y-auto scrollbar-thin">
           {sessions.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-4">No saved sessions.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No saved sessions.</p>
           )}
           {sessions.map((s) => (
             <div
               key={s.id}
-              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors ${
-                s.id === activeSessionId ? 'border-brand-300 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'
+              className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+                s.id === activeSessionId
+                  ? 'border-primary/40 bg-accent'
+                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50'
               }`}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm font-semibold truncate">{s.name}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   {new Date(s.updated_at).toLocaleString()}
                 </p>
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-6 px-2 text-primary"
                 onClick={() => { loadSession(s); setOpen(false) }}
-                className="text-xs text-brand-600 hover:underline"
               >
                 Load
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-6 px-2 text-destructive hover:text-destructive"
                 onClick={() => removeSession(s.id)}
-                className="text-xs text-red-500 hover:underline"
               >
                 Delete
-              </button>
+              </Button>
             </div>
           ))}
         </div>
-
-        <button
-          onClick={() => setOpen(false)}
-          className="mt-4 w-full text-sm text-gray-500 hover:text-gray-700"
-        >
-          Close
-        </button>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

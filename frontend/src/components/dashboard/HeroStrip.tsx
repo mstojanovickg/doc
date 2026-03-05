@@ -11,22 +11,30 @@ interface KPICardProps {
 
 function KPICard({ label, value, sub, positive }: KPICardProps) {
   const border =
-    positive === null ? 'border-blue-200' : positive ? 'border-green-200' : 'border-red-200'
+    positive === null ? 'border-blue-300 dark:border-blue-700'
+    : positive ? 'border-brand-300 dark:border-brand-700'
+    : 'border-red-300 dark:border-red-800'
+
   const bg =
-    positive === null ? 'bg-blue-50' : positive ? 'bg-green-50' : 'bg-red-50'
+    positive === null ? 'bg-blue-50 dark:bg-blue-950/30'
+    : positive ? 'bg-brand-50 dark:bg-brand-950/20'
+    : 'bg-red-50 dark:bg-red-950/20'
+
   const textColor =
-    positive === null ? 'text-blue-800' : positive ? 'text-green-800' : 'text-red-800'
-  const arrow =
-    positive === null ? '' : positive ? ' ↑' : ' ↓'
+    positive === null ? 'text-blue-800 dark:text-blue-300'
+    : positive ? 'text-brand-800 dark:text-brand-300'
+    : 'text-red-800 dark:text-red-400'
+
+  const arrow = positive === null ? '' : positive ? ' ↑' : ' ↓'
 
   return (
     <div className={`rounded-xl border-2 p-5 ${border} ${bg}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${textColor}`}>
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{label}</p>
+      <p className={`text-3xl font-extrabold ${textColor} leading-tight`}>
         {value}
-        <span className="text-base">{arrow}</span>
+        <span className="text-xl">{arrow}</span>
       </p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{sub}</p>}
     </div>
   )
 }

@@ -4,7 +4,59 @@
 
 @layer base {
   html {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Theme transition — only on elements that explicitly opt in */
+  .theme-transition, .theme-transition * {
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 21 90% 48%;        /* orange-600 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 33 100% 96%;        /* orange-50 */
+    --accent-foreground: 21 90% 48%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 21 90% 48%;
+    --nav: 222 47% 11%;
+    --nav-foreground: 0 0% 98%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 7%;        /* near-black #111 */
+    --foreground: 210 17% 90%;
+    --card: 0 0% 11%;             /* #1c1c1c */
+    --card-foreground: 210 17% 90%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 210 17% 90%;
+    --primary: 25 95% 53%;        /* orange-500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 210 17% 90%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 215 14% 55%;
+    --accent: 21 70% 15%;
+    --accent-foreground: 25 95% 65%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 18%;           /* subtle #2d2d2d */
+    --input: 0 0% 18%;
+    --ring: 25 95% 53%;
+    --nav: 0 0% 6%;
+    --nav-foreground: 210 17% 90%;
   }
 }
 
@@ -18,6 +70,12 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 2px;
+  }
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #4b5563;
   }
 }
 

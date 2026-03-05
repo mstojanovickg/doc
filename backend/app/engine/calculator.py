@@ -185,20 +185,24 @@ def _build_loan_schedule(
 def _calc_robot(inp: CalculationInput, manual: ManualDerived) -> tuple[RobotDerived, list[str]]:
     warnings: list[str] = []
 
-    # ── Time (robot works full TDW, no breaks) ────────────────────────────────
-    tdw = inp.shifts * inp.shift_duration
-    awt_robot = tdw * inp.workdays_month * 12  # min/year
+    # ── Time (robot uses its own schedule) ────────────────────────────────────
+    # Robot net daily working time accounts for optional break periods
+    robot_tdw = inp.robot_shifts * inp.robot_shift_duration                         # min/day (gross)
+    robot_ndw = robot_tdw - inp.robot_shifts * inp.robot_breaks * inp.robot_break_duration  # min/day (net)
+    awt_robot = robot_ndw * inp.robot_workdays_month * 12                           # min/year
     awt_robot_hours = awt_robot / 60
 
     # ── Production ────────────────────────────────────────────────────────────
-    dpv = _safe_div(tdw, inp.ct_manual)                                  # units/day
-    monthly_production = dpv * inp.workdays_month
+    dpv = _safe_div(robot_ndw, inp.ct_robot)                             # units/day
+    monthly_production = dpv * inp.robot_workdays_month
     annual_production = monthly_production * 12
 
     # ── Defect rate ───────────────────────────────────────────────────────────
-    # DR_R = robot_defects / (DPV_R × workdays) × 0.1   (robot defect rate is
-    # typically lower; the ×0.1 factor from spec represents a 10% defect share)
-    defect_rate = _safe_div(inp.robot_defects_month, monthly_production) * 0.1
+    # Robot defect rate = manual defect rate × (1 - defect_share_at_position × reduction)
+    robot_defect_rate_direct = _safe_div(inp.robot_defects_month, monthly_production)
+    defect_rate = max(0.0, manual.defect_rate * (1 - inp.defect_share_at_position * inp.injury_reduction_pct))
+    if inp.robot_defects_month > 0:
+        defect_rate = robot_defect_rate_direct
 
     # ── Investment ────────────────────────────────────────────────────────────
     engineering_cost = inp.engineer_hours * inp.engineer_hourly_rate
@@ -224,15 +228,14 @@ def _calc_robot(inp: CalculationInput, manual: ManualDerived) -> tuple[RobotDeri
     # ── Amortization ─────────────────────────────────────────────────────────
     annual_amortization = total_investment * inp.amortization_rate
 
-    # ── Labor ─────────────────────────────────────────────────────────────────
-    # LC_R = same salary × 13 × workers × operator_time_fraction
-    annual_labor_cost = inp.gross_salary * 13 * inp.workers * inp.operator_time_fraction
+    # ── Labor (robot operators with their own salary) ─────────────────────────
+    salary = inp.robot_operator_salary if inp.robot_operator_salary > 0 else inp.gross_salary
+    annual_labor_cost = salary * 13 * inp.robot_operators * inp.operator_time_fraction
 
     # Technician cost (annual)
     annual_technician_cost = inp.technician_hours * inp.technician_hourly_rate
 
     # ── Electricity ───────────────────────────────────────────────────────────
-    # EC = Power_kW × AWT_robot_hours × Price_kWh
     annual_electricity_cost = inp.power_consumption * awt_robot_hours * inp.electricity_price_kwh
 
     # ── Maintenance ───────────────────────────────────────────────────────────
@@ -242,13 +245,8 @@ def _calc_robot(inp: CalculationInput, manual: ManualDerived) -> tuple[RobotDeri
     annual_gripper_cost = inp.gripper_replacements_year * inp.gripper_price
 
     # ── Service downtime cost ─────────────────────────────────────────────────
-    # Service sessions reduce available production time
     monthly_service_downtime_min = inp.robot_service_frequency * inp.robot_service_duration
     annual_service_downtime_hours = monthly_service_downtime_min * 12 / 60
-    # Cost = lost production × (revenue - material cost) per minute
-    revenue_per_min = _safe_div(annual_production * inp.product_price, awt_robot)
-    annual_service_downtime_cost = monthly_service_downtime_min * 12 * revenue_per_min * 0.0  # deferred to availability
-    # Instead, track as labor cost during downtime
     lc_per_hour_robot = _safe_div(annual_labor_cost, awt_robot_hours)
     annual_service_downtime_cost = annual_service_downtime_hours * lc_per_hour_robot
 
@@ -271,7 +269,7 @@ def _calc_robot(inp: CalculationInput, manual: ManualDerived) -> tuple[RobotDeri
         + annual_defect_cost
         + annual_inventory_cost
         + annual_amortization
-        + annual_loan_interest          # interest is an expense; principal is cash flow
+        + annual_loan_interest
         + annual_technician_cost
         + annual_production * inp.production_cost_per_unit
     )
@@ -293,26 +291,21 @@ def _calc_robot(inp: CalculationInput, manual: ManualDerived) -> tuple[RobotDeri
 
     # ── OEE ───────────────────────────────────────────────────────────────────
     daily_service_downtime = _safe_div(
-        inp.robot_service_frequency * inp.robot_service_duration, inp.workdays_month
+        inp.robot_service_frequency * inp.robot_service_duration, inp.robot_workdays_month
     )
-    availability = _safe_div(tdw - daily_service_downtime, tdw)
+    availability = _safe_div(robot_ndw - daily_service_downtime, robot_tdw)
     availability = max(0.0, min(1.0, availability))
-    performance = 1.0
+    performance = min(1.0, _safe_div(inp.takt_time, inp.ct_robot))
     quality = max(0.0, 1.0 - defect_rate)
     oee = availability * performance * quality
 
     # ── Dashboard indicators ──────────────────────────────────────────────────
-    # Installation cost per robot operating hour
     installation_cost_per_hour = _safe_div(
         inp.robot_price + inp.additional_equipment_cost, awt_robot_hours
     )
-    # Training cost per produced unit
     training_cost_per_unit = _safe_div(training_cost, annual_production)
-    # Programming/engineering cost per produced unit
     programming_cost_per_unit = _safe_div(engineering_cost, annual_production)
-    # Maintenance & repair cost per robot hour
     maintenance_cost_per_hour = _safe_div(annual_maintenance_cost, awt_robot_hours)
-    # Saved employee turnover (robot doesn't change jobs)
     annual_employee_turnover_saved = manual.annual_turnover_cost
 
     return (
@@ -427,9 +420,10 @@ def calculate(inp: CalculationInput) -> CalculationResult:
     roi = _safe_div(delta_np, robot.total_investment)
     payback_months = _safe_div(robot.total_investment, delta_np / 12) if delta_np > 0 else 0.0
 
-    # Saved working hours: manual human AWT vs robot human AWT (reduced by OPT%)
-    human_awt_robot_hours = manual.awt_hours * inp.operator_time_fraction
-    annual_saved_hours = manual.awt_hours - human_awt_robot_hours
+    # Saved working hours: manual human AWT vs robot operator AWT (reduced by OPT%)
+    robot_human_awt_hours = (inp.robot_operators * inp.robot_shifts * inp.robot_workdays_month * 12
+                              * inp.robot_shift_duration / 60) * inp.operator_time_fraction
+    annual_saved_hours = max(0.0, manual.awt_hours - robot_human_awt_hours)
 
     npv_pess = _calc_scenario_npv(inp, manual, robot, inp.scenario_pessimistic, "Pessimistic")
     npv_real = _calc_scenario_npv(inp, manual, robot, inp.scenario_realistic, "Realistic")

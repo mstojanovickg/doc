@@ -35,6 +35,16 @@ export interface CalculationInput {
   job_changes_year: number
   training_hours_manual: number  // hours
 
+  // 3.2.R Robot Production Schedule
+  robot_shifts: number
+  robot_shift_duration: number    // minutes
+  robot_breaks: number
+  robot_break_duration: number    // minutes
+  robot_workdays_month: number
+  ct_robot: number                // minutes
+  robot_operators: number
+  robot_operator_salary: number   // RSD/month
+
   // 3.3.1 Robot Technical
   robot_price: number
   power_consumption: number

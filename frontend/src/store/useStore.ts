@@ -6,63 +6,73 @@ import { runCalculation, listSessions, createSession, updateSession, deleteSessi
 
 export const DEFAULT_INPUTS: CalculationInput = {
   // General
-  product_price: 0,
-  production_cost_per_unit: 0,
-  takt_time: 1,
-  pre_process_inventory: 0,
+  product_price: 1350,
+  production_cost_per_unit: 870,
+  takt_time: 8 + 26 / 60,       // 8 min 26 sec
+  pre_process_inventory: 1000,
   annual_sales_growth: 0.05,
 
   // Manual
-  shifts: 1,
+  shifts: 2,
   shift_duration: 480,
   breaks: 2,
-  break_duration: 20,
+  break_duration: 40,
   workdays_month: 22,
   workers: 1,
-  ct_manual: 1,
-  gross_salary: 0,
-  defects_month: 0,
-  sick_days_year: 0,
+  ct_manual: 8 + 26 / 60,       // 8 min 26 sec
+  gross_salary: 100000,
+  defects_month: 30,
+  sick_days_year: 10,
   injuries_month: 0,
-  breakdowns_month: 0,
-  avg_repair_time: 0,
-  nonconformities_month: 0,
-  process_nonconformities_month: 0,
-  job_changes_year: 0,
-  training_hours_manual: 0,
+  breakdowns_month: 3,
+  avg_repair_time: 60,
+  nonconformities_month: 100,
+  process_nonconformities_month: 1,
+  job_changes_year: 5,
+  training_hours_manual: 2,
+
+  // Robot schedule
+  robot_shifts: 2,
+  robot_shift_duration: 480,
+  robot_breaks: 0,
+  robot_break_duration: 0,
+  robot_workdays_month: 22,
+  ct_robot: 8 + 26 / 60,        // 8 min 26 sec
+  robot_operators: 2,
+  robot_operator_salary: 100000,
 
   // Robot technical
-  robot_price: 0,
-  power_consumption: 0,
-  gripper_price: 0,
+  robot_price: 3292800,
+  power_consumption: 3,
+  gripper_price: 235200,
   gripper_replacements_year: 0,
-  additional_equipment_cost: 0,
-  maintenance_cost_monthly: 0,
-  robot_defects_month: 0,
+  additional_equipment_cost: 1176000,
+  maintenance_cost_monthly: 6500,
+  robot_defects_month: 500,
   robot_service_frequency: 0,
   robot_service_duration: 0,
 
   // Energy
-  electricity_price_kwh: 0,
-  pre_process_inventory_robot: 0,
+  electricity_price_kwh: 18,
+  pre_process_inventory_robot: 1000,
 
   // Robot labor
-  training_hours_robot: 0,
-  training_hourly_cost: 0,
-  engineer_hours: 0,
-  engineer_hourly_rate: 0,
+  training_hours_robot: 10,         // 10 h = 600 min
+  training_hourly_cost: 630,
+  engineer_hours: 1000,             // 1 000 h = 60 000 min
+  engineer_hourly_rate: 1250,
   technician_hours: 0,
   technician_hourly_rate: 0,
-  injury_reduction_pct: 0.05,
+  injury_reduction_pct: 0.05,       // 5 %
   defect_share_at_position: 0.01,
-  operator_time_fraction: 1.0,
+  operator_time_fraction: 30 / 480, // 30 min supervision per 480 min shift
 
   // Financing
   financing_type: 'own_funds',
   loan_amount: 0,
-  annual_interest_rate: 0.08,
+  annual_interest_rate: 0.06,       // 6 %
   loan_term_months: 60,
-  amortization_rate: 0.20,
+  amortization_rate: 0.14,          // 14 % depreciation rate
   wacc: 0.10,
 
   scenario_pessimistic: { inflow_change: 0.02, outflow_change: 0.05, discount_rate_adj: 0.02 },
@@ -83,6 +93,10 @@ interface AppState {
   // View
   view: 'wizard' | 'dashboard'
 
+  // Theme
+  theme: 'light' | 'dark'
+  toggleTheme: () => void
+
   // Sessions
   sessions: SessionRecord[]
   activeSessionId: string | null
@@ -92,7 +106,7 @@ interface AppState {
   setStep: (step: number) => void
   updateInputs: (patch: Partial<CalculationInput>) => void
   resetInputs: () => void
-  calculate: () => Promise<void>
+  calculate: (navigate?: boolean) => Promise<void>
   setView: (v: 'wizard' | 'dashboard') => void
 
   // Session actions
@@ -102,6 +116,8 @@ interface AppState {
   removeSession: (id: string) => Promise<void>
 }
 
+const storedTheme = (localStorage.getItem('theme') as 'light' | 'dark' | null) ?? 'light'
+
 export const useStore = create<AppState>((set, get) => ({
   currentStep: 1,
   inputs: { ...DEFAULT_INPUTS },
@@ -109,9 +125,22 @@ export const useStore = create<AppState>((set, get) => ({
   isCalculating: false,
   calcError: null,
   view: 'wizard',
+  theme: storedTheme,
   sessions: [],
   activeSessionId: null,
   sessionsLoading: false,
+
+  toggleTheme: () => {
+    const next = get().theme === 'light' ? 'dark' : 'light'
+    localStorage.setItem('theme', next)
+    // Apply immediately — don't wait for React's async useEffect
+    if (next === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    set({ theme: next })
+  },
 
   setStep: (step) => set({ currentStep: step }),
 
@@ -121,11 +150,11 @@ export const useStore = create<AppState>((set, get) => ({
   resetInputs: () =>
     set({ inputs: { ...DEFAULT_INPUTS }, result: null, calcError: null, currentStep: 1, view: 'wizard' }),
 
-  calculate: async () => {
+  calculate: async (navigate = false) => {
     set({ isCalculating: true, calcError: null })
     try {
       const result = await runCalculation(get().inputs)
-      set({ result, isCalculating: false, view: 'dashboard' })
+      set({ result, isCalculating: false, ...(navigate ? { view: 'dashboard' } : {}) })
       // Auto-save if there's an active session
       const { activeSessionId, inputs } = get()
       if (activeSessionId) {

@@ -41,6 +41,16 @@ class CalculationInput(BaseModel):
     job_changes_year: float = Field(default=0.0, ge=0)
     training_hours_manual: float = Field(default=0.0, ge=0, description="Training hours per worker (hours)")
 
+    # ── 3.2.R Robotic Production Schedule ────────────────────────────────────
+    robot_shifts: int = Field(default=1, ge=1, description="Number of robot shifts")
+    robot_shift_duration: float = Field(default=480.0, gt=0, description="Robot shift duration (minutes)")
+    robot_breaks: int = Field(default=0, ge=0, description="Breaks per robot shift (usually 0)")
+    robot_break_duration: float = Field(default=0.0, ge=0, description="Break duration during robot shift (minutes)")
+    robot_workdays_month: int = Field(default=22, ge=1, description="Robot working days per month")
+    ct_robot: float = Field(default=1.0, gt=0, description="Robot cycle time (minutes)")
+    robot_operators: int = Field(default=1, ge=1, description="Number of robot operators")
+    robot_operator_salary: float = Field(default=0.0, ge=0, description="Robot operator monthly gross salary (RSD)")
+
     # ── 3.3.1 Robot Technical ────────────────────────────────────────────────
     robot_price: float = Field(gt=0, description="Robot purchase cost (RSD)")
     power_consumption: float = Field(gt=0, description="Power consumption (kW)")

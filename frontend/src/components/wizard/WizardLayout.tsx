@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { Step1General } from './steps/Step1General'
 import { Step2Manual } from './steps/Step2Manual'
@@ -20,11 +20,13 @@ const STEP_COMPONENTS = [Step1General, Step2Manual, Step3RobotTech, Step4RobotLa
 export function WizardLayout() {
   const { currentStep, setStep, inputs, calculate, isCalculating, calcError, result, setView } = useStore()
 
-  // Recalculate whenever inputs change (debounced)
+  // Recalculate whenever inputs change (debounced), but skip the initial mount
+  const mounted = useRef(false)
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return }
     const timer = setTimeout(() => {
       if (inputs.product_price > 0 && inputs.ct_manual > 0 && inputs.robot_price > 0) {
-        calculate()
+        calculate()   // silent — does not navigate
       }
     }, 800)
     return () => clearTimeout(timer)
@@ -37,98 +39,125 @@ export function WizardLayout() {
     <div className="flex h-full">
       {/* ── Main wizard area ───────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Progress bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-3">
-          <div className="flex items-center gap-2">
-            {STEPS.map((s, idx) => (
-              <React.Fragment key={s.id}>
+        {/* Step navigator */}
+        <div className="bg-white dark:bg-[#111111] border-b border-gray-200 dark:border-white/[0.07]">
+          <div className="flex">
+            {STEPS.map((s, idx) => {
+              const isActive = s.id === currentStep
+              const isDone = s.id < currentStep
+              return (
                 <button
+                  key={s.id}
                   onClick={() => setStep(s.id)}
-                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                    s.id === currentStep
-                      ? 'text-brand-700'
-                      : s.id < currentStep
-                      ? 'text-brand-500 hover:text-brand-700'
-                      : 'text-gray-400'
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
-                      s.id === currentStep
-                        ? 'bg-brand-600 border-brand-600 text-white'
-                        : s.id < currentStep
-                        ? 'bg-brand-100 border-brand-400 text-brand-700'
-                        : 'bg-gray-100 border-gray-300 text-gray-500'
+                  className={`relative flex items-center gap-2 px-4 py-3 text-xs font-medium transition-colors flex-1 justify-center
+                    border-b-2 hover:bg-gray-50 dark:hover:bg-white/[0.03]
+                    ${isActive
+                      ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-500/[0.07]'
+                      : isDone
+                      ? 'border-transparent text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      : 'border-transparent text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'
                     }`}
+                >
+                  {/* Step indicator */}
+                  <span className={`w-4.5 h-4.5 flex items-center justify-center rounded-full text-[9px] font-bold flex-shrink-0
+                    ${isActive
+                      ? 'bg-brand-500 text-white'
+                      : isDone
+                      ? 'bg-brand-500/15 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400'
+                      : 'bg-gray-100 text-gray-400 dark:bg-white/[0.06] dark:text-gray-600'
+                    }`}
+                    style={{ width: '18px', height: '18px' }}
                   >
-                    {s.id < currentStep ? '✓' : s.id}
+                    {isDone
+                      ? <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>
+                      : s.id
+                    }
                   </span>
-                  <span className="hidden sm:inline">{s.label}</span>
+                  <span className="hidden sm:inline tracking-wide">{s.label}</span>
+                  {/* Separator dot between steps */}
+                  {idx < STEPS.length - 1 && (
+                    <span className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-200 dark:text-white/10 text-xs select-none pointer-events-none hidden sm:block">|</span>
+                  )}
                 </button>
-                {idx < STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 ${idx < currentStep - 1 ? 'bg-brand-400' : 'bg-gray-200'}`} />
-                )}
-              </React.Fragment>
-            ))}
+              )
+            })}
           </div>
         </div>
 
         {/* Step content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <StepComponent />
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-[#0f0f0f] scrollbar-thin">
+          <div className="max-w-2xl mx-auto">
+            <StepComponent />
 
-          {calcError && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-              {calcError}
-            </div>
-          )}
+            {calcError && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-400">
+                {calcError}
+              </div>
+            )}
 
-          {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-4 border-t border-gray-100">
-            <button
-              disabled={currentStep === 1}
-              onClick={() => setStep(currentStep - 1)}
-              className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ← Back
-            </button>
+            {/* Navigation */}
+            <div className="flex justify-between mt-8 pt-4 border-t border-gray-200 dark:border-white/[0.06]">
+              <button
+                disabled={currentStep === 1}
+                onClick={() => setStep(currentStep - 1)}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-md
+                           text-gray-500 dark:text-gray-400
+                           border border-gray-200 dark:border-white/10
+                           hover:text-gray-800 dark:hover:text-gray-200
+                           hover:bg-gray-50 dark:hover:bg-white/[0.05]
+                           disabled:opacity-30 disabled:cursor-not-allowed
+                           transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                Back
+              </button>
 
-            <div className="flex gap-3">
-              {currentStep < 5 ? (
-                <button
-                  onClick={() => setStep(currentStep + 1)}
-                  className="px-5 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 transition-colors"
-                >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  onClick={() => calculate()}
-                  disabled={isCalculating}
-                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-60 transition-colors"
-                >
-                  {isCalculating ? 'Calculating…' : 'Calculate & View Dashboard →'}
-                </button>
-              )}
+              <div className="flex gap-2">
+                {result && (
+                  <button
+                    onClick={() => setView('dashboard')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-md
+                               text-brand-600 dark:text-brand-400
+                               border border-brand-200 dark:border-brand-500/30
+                               hover:bg-brand-50 dark:hover:bg-brand-500/10
+                               transition-colors"
+                  >
+                    View Dashboard
+                  </button>
+                )}
 
-              {result && (
-                <button
-                  onClick={() => setView('dashboard')}
-                  className="px-4 py-2 text-sm font-medium text-brand-700 border border-brand-300 rounded-md hover:bg-brand-50"
-                >
-                  View Dashboard
-                </button>
-              )}
+                {currentStep < 5 ? (
+                  <button
+                    onClick={() => setStep(currentStep + 1)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md
+                               text-white bg-brand-500 hover:bg-brand-600
+                               transition-colors"
+                  >
+                    Next
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => calculate(true)}
+                    disabled={isCalculating}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold rounded-md
+                               text-white bg-brand-500 hover:bg-brand-600
+                               disabled:opacity-50 transition-colors"
+                  >
+                    {isCalculating
+                      ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />Calculating…</>
+                      : <>Calculate &amp; View Dashboard <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg></>
+                    }
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── KPI sidebar ────────────────────────────────────────────────────── */}
-      <div className="w-64 border-l border-gray-200 bg-gray-50 flex-shrink-0 hidden lg:flex flex-col">
-        <div className="px-4 py-3 border-b border-gray-200 bg-white">
-          <p className="text-xs font-semibold text-gray-600">LIVE KPI PREVIEW</p>
-        </div>
+      <div className="w-64 border-l border-gray-200 dark:border-white/[0.06] bg-white dark:bg-[#0d0d0d] flex-shrink-0 hidden lg:flex flex-col">
         <KPISidebar />
       </div>
     </div>
